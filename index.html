@@ -10,9 +10,10 @@
     <title>Excel Data Upload</title>
     <style>
         .tableHeader {
-             background-color: blue;
-             color: aqua;
+            background-color: blue;
+            color: aqua;
         }
+
         body {
             background-color: #f5f5f5;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -20,12 +21,12 @@
 
         .container {
             background-color: white;
-            
             border-radius: 15px;
             padding: 20px;
             box-shadow: 0px 5px 15px rgba(0, 0, 0, 0.1);
-            max-width: 800px;
+            max-width: 100%;
             margin: 20px auto;
+            overflow: hidden; /* Ensure no overflow on container */
         }
 
         h2 {
@@ -34,10 +35,18 @@
             text-align: center;
         }
 
+        .table-container {
+            max-height: 400px; /* Set max height for scrolling */
+            overflow-y: auto; /* Enable vertical scrolling */
+            overflow-x: hidden; /* Hide horizontal scrolling */
+            margin-top: 20px;
+            border: 1px solid #ccc; /* Optional border for visual clarity */
+            border-radius: 10px; /* Rounded corners */
+        }
+
         .table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 20px;
         }
 
         .table th,
@@ -45,6 +54,7 @@
             border: 1px solid #ccc;
             padding: 10px;
             text-align: center;
+            word-wrap: break-word;
         }
 
         .table thead th {
@@ -79,6 +89,65 @@
             font-size: 0.9rem;
             background-color: #e8f0fe;
         }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+
+            .table {
+                font-size: 12px;
+            }
+
+            .table th, .table td {
+                padding: 5px;
+            }
+
+            .pagination-buttons {
+                flex-direction: column;
+            }
+        }
+        .table-container {
+    max-height: 400px; /* Keep vertical scroll */
+    overflow-y: auto;
+    overflow-x: auto; /* Allow horizontal scroll */
+    margin-top: 20px;
+    border: 1px solid #ccc;
+    border-radius: 10px;
+    position: relative; /* Needed for proper positioning */
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    /* table-layout: fixed; Keeps all columns consistent in width */
+}
+
+.table th,
+.table td {
+    border: 1px solid #ccc;
+    padding: 10px;
+    text-align: center;
+    word-wrap: break-word;
+}
+
+.table thead th {
+    background-color: #4CAF50; /* Keep the green color */
+    color: #fff;
+    font-weight: bold;
+    position: sticky; /* Sticky positioning to freeze the header */
+    top: 0; /* Keeps it fixed at the top */
+    z-index: 1; /* Makes sure header stays above other content */
+}
+
+.table th:first-child,
+.table td:first-child {
+    position: sticky; /* Sticky positioning to freeze the first column */
+    left: 0; /* Keep it aligned to the left */
+    z-index: 2; /* Ensures it stays above other content */
+    background-color: #f8f9fa; /* Light background for better visibility */
+}
+
     </style>
 </head>
 
@@ -86,44 +155,36 @@
     <div class="container">
         <h2>Multi-Sheet Excel Report</h2>
         <input type="file" id="uploadExcel" class="form-control mb-3" accept=".xlsx" />
-    
-        <!-- Separate Div for Header -->
-        <div id="headerDiv" class="text-center p-2 mb-3">
-            <!-- Header will be displayed here -->
+
+        <div id="headerDiv" class="text-center p-2 mb-3"></div>
+
+        <!-- Added a container for the table to allow scrolling -->
+        <div class="table-container">
+            <table class="table table-hover table-bordered" id="excelTable">
+                <tbody id="excelDataBody"></tbody>
+            </table>
         </div>
-    
-        <table class="table table-hover table-bordered" id="excelTable">
-            <tbody id="excelDataBody">
-                <!-- Excel data will be inserted here -->
-            </tbody>
-        </table>
-    
-        <!-- Pagination buttons -->
+
         <div class="pagination-buttons">
             <button id="prevButton" class="btn btn-danger hidden">Previous</button>
             <button id="nextButton" class="btn btn-success hidden">Next</button>
         </div>
-    
-        <!-- History Section -->
+
         <div class="card shadow-sm mt-4">
             <h2 class="text-secondary mb-4">Action History</h2>
-            <ul id="historyList" class="list-group">
-                <!-- History items will be added here -->
-            </ul>
+            <ul id="historyList" class="list-group"></ul>
             <div class="history-buttons text-center mt-3">
                 <button id="resetHistory" class="btn btn-warning">Reset History</button>
             </div>
         </div>
     </div>
-    
 
     <script>
         let currentPage = 1;
-        let totalPages = 0; // Placeholder for total pages
+        let totalPages = 0;
         let sheetData = [];
         let history = [];
 
-        // Add history to the list
         function addHistory(action, sheetNumber) {
             const timestamp = new Date().toLocaleString();
             const historyItem = `${timestamp} - ${action} (Sheet ${sheetNumber})`;
@@ -131,10 +192,9 @@
             updateHistoryDisplay();
         }
 
-        // Display history list
         function updateHistoryDisplay() {
             const historyList = document.getElementById('historyList');
-            historyList.innerHTML = ''; // Clear existing history
+            historyList.innerHTML = '';
             history.forEach(item => {
                 const listItem = document.createElement('li');
                 listItem.textContent = item;
@@ -143,7 +203,6 @@
             });
         }
 
-        // Reset history
         document.getElementById('resetHistory').addEventListener('click', function () {
             if (confirm("Are you sure you want to reset the history?")) {
                 history = [];
@@ -158,8 +217,7 @@
                 const data = new Uint8Array(e.target.result);
                 const workbook = XLSX.read(data, { type: 'array' });
 
-                // Extract data from all sheets dynamically
-                totalPages = workbook.SheetNames.length; // Set total pages based on number of sheets
+                totalPages = workbook.SheetNames.length;
                 sheetData = workbook.SheetNames.map(sheetName =>
                     XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1 })
                 );
@@ -167,32 +225,29 @@
                 currentPage = 1;
                 displayTable();
                 updatePaginationButtons();
-                
-                addHistory("File uploaded", currentPage); // Add upload history
+                addHistory("File uploaded", currentPage);
             };
             reader.readAsArrayBuffer(file);
         });
 
-            function displayTable() {
-            const headerDiv = document.getElementById('headerDiv'); // For showing header
-            const tableBody = document.getElementById('excelDataBody'); // For table body
-            const sheet = sheetData[currentPage - 1]; // Get current sheet's data
+        function displayTable() {
+            const headerDiv = document.getElementById('headerDiv');
+            const tableBody = document.getElementById('excelDataBody');
+            const sheet = sheetData[currentPage - 1];
 
-            headerDiv.innerHTML = ''; // Clear previous header
-            tableBody.innerHTML = ''; // Clear previous data
+            headerDiv.innerHTML = '';
+            tableBody.innerHTML = '';
 
-            // Display header in separate div
             if (sheet[0] && sheet[0].length > 0) {
                 sheet[0].forEach(header => {
                     const headerSpan = document.createElement('span');
                     headerSpan.textContent = header;
-                    headerSpan.style.marginRight = '15px'; // Add spacing
+                    headerSpan.style.marginRight = '15px';
                     headerSpan.style.fontWeight = 'bold';
                     headerDiv.appendChild(headerSpan);
                 });
             }
 
-            // Populate table body (without the header row)
             sheet.slice(1).forEach(row => {
                 const rowElement = document.createElement('tr');
                 row.forEach(cell => {
@@ -203,36 +258,33 @@
                 tableBody.appendChild(rowElement);
             });
 
-            // Apply background color styles based on the current sheet
             switch (currentPage) {
                 case 1:
                     headerDiv.style.backgroundColor = '#4CAF50';
-                    headerDiv.style.color = 'lightgreen'; // Green
+                    headerDiv.style.color = 'lightgreen';
                     break;
                 case 2:
-                    headerDiv.style.backgroundColor = '#2196F3'; // Blue
+                    headerDiv.style.backgroundColor = '#2196F3';
                     break;
                 case 3:
-                    headerDiv.style.backgroundColor = '#795548'; // Brown
+                    headerDiv.style.backgroundColor = '#795548';
                     break;
                 case 4:
-                    headerDiv.style.backgroundColor = '#FFEB3B'; // Yellow
+                    headerDiv.style.backgroundColor = '#FFEB3B';
                     break;
                 case 5:
-                    headerDiv.style.backgroundColor = '#81C784'; // Light Green
+                    headerDiv.style.backgroundColor = '#81C784';
                     break;
                 case 6:
-                    headerDiv.style.backgroundColor = '#F48FB1'; // Light Pink
+                    headerDiv.style.backgroundColor = '#F48FB1';
                     break;
                 case 7:
-                    headerDiv.style.backgroundColor = '#81D4FA'; // Light Blue
+                    headerDiv.style.backgroundColor = '#81D4FA';
                     break;
                 default:
-                    headerDiv.style.backgroundColor = ''; // Default if no match
+                    headerDiv.style.backgroundColor = '';
             }
         }
-
-
 
         function updatePaginationButtons() {
             const prevButton = document.getElementById('prevButton');
